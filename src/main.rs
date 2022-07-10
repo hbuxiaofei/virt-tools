@@ -1,10 +1,20 @@
 use clap::{App, Arg, SubCommand};
+use std::{thread, time};
 
 use block::device::BlockDevice;
+use cpu::schema::CpuSchema;
 use disk::schema::DiskSchema;
 use sector::schema::SectorSchema;
 
 fn main() {
+    let mut cpu = CpuSchema::new();
+    cpu.create();
+    thread::sleep(time::Duration::from_secs(2));
+    cpu.start();
+    thread::sleep(time::Duration::from_secs(30));
+    // cpu.stop();
+    cpu.kill();
+
     let dev_path = "/dev/nbd0";
     let disk = DiskSchema::new(dev_path);
 

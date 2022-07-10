@@ -11,6 +11,7 @@ block = { path = "block" }
 sector = { path = "sector" }
 cluster = { path = "cluster" }
 disk = { path = "disk" }
+cpu = { path = "cpu" }
 
 [workspace]
 members = [
@@ -18,6 +19,7 @@ members = [
     "sector",
     "cluster",
     "disk",
+    "cpu",
 ]
 
 [[bin]]
