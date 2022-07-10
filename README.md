@@ -1,2 +1,2 @@
 # virt-tools
-KVM virtualization development tools.
+KVM virtualization test tools.
