@@ -1,0 +1,25 @@
+[package]
+name = "virt-tools"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bincode = "1.0"
+bytes = "0.4"
+clap = "3.2"
+block = { path = "block" }
+sector = { path = "sector" }
+cluster = { path = "cluster" }
+disk = { path = "disk" }
+
+[workspace]
+members = [
+    "block",
+    "sector",
+    "cluster",
+    "disk",
+]
+
+[[bin]]
+name = "virt-tools"
+path = "src/main.rs"

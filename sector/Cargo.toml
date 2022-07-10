@@ -1,0 +1,13 @@
+[package]
+name = "sector"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+serde = { version = "1.0", features = ["derive"] }
+chrono = { version = "0.4", features = ["serde"]}
+positioned-io = "0.2.2"
+byteorder = "1.4.3"
+sha2 = "0.10"
