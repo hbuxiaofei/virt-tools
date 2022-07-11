@@ -2,18 +2,18 @@ use clap::{App, Arg, SubCommand};
 use std::{thread, time};
 
 use block::device::BlockDevice;
-use cpu::schema::CpuSchema;
 use disk::schema::DiskSchema;
 use sector::schema::SectorSchema;
+use stress::schema::StressSchema;
 
-fn stress() {
-    let mut cpu = CpuSchema::new();
-    cpu.create();
+fn run_stress() {
+    let mut s = StressSchema::new();
+    s.create();
     thread::sleep(time::Duration::from_secs(2));
-    cpu.start();
+    s.start();
     thread::sleep(time::Duration::from_secs(10));
-    // cpu.pause();
-    cpu.kill();
+    // s.pause();
+    s.kill();
 }
 
 fn main() {
@@ -57,7 +57,7 @@ fn main() {
         } else {
             println!("Printing normally...");
         }
-        stress();
+        run_stress();
     } else if let Some(matches) = matches.subcommand_matches("disk-write") {
         if matches.is_present("debug") {
             println!("Printing debug info...");

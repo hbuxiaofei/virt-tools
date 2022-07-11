@@ -19,7 +19,7 @@ enum State {
     Killed,
 }
 
-pub struct CpuSchema {
+pub struct StressSchema {
     cmd: Arc<RwLock<Command>>,
     stat: Arc<RwLock<State>>,
 }
@@ -36,9 +36,9 @@ impl Default for State {
     }
 }
 
-impl CpuSchema {
+impl StressSchema {
     pub fn new() -> Self {
-        CpuSchema {
+        StressSchema {
             cmd: Arc::new(RwLock::new(Command::Pause)),
             stat: Arc::new(RwLock::new(State::Killed)),
         }
