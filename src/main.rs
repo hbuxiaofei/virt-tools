@@ -70,6 +70,7 @@ fn main() {
     }
 }
 
+#[allow(dead_code)]
 fn main_bak() {
     // fill_whole_disk();
 

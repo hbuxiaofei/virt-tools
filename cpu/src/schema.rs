@@ -1,9 +1,8 @@
-use ndarray;
 use rand::Rng;
 use std::collections::HashMap;
 use std::fs::File;
-use std::io::{BufRead, BufReader, Write};
-use std::sync::{Arc, Mutex};
+use std::io::{BufRead, BufReader};
+use std::sync::{Arc, RwLock};
 use std::{thread, time};
 
 #[derive(PartialEq, Copy, Clone)]
@@ -17,11 +16,12 @@ enum Command {
 enum State {
     Stoped,
     Running,
+    Killed,
 }
 
 pub struct CpuSchema {
-    cmd: Arc<Mutex<Command>>,
-    stat: Arc<Mutex<State>>,
+    cmd: Arc<RwLock<Command>>,
+    stat: Arc<RwLock<State>>,
 }
 
 impl Default for Command {
@@ -32,37 +32,49 @@ impl Default for Command {
 
 impl Default for State {
     fn default() -> Self {
-        State::Stoped
+        State::Killed
     }
 }
 
 impl CpuSchema {
     pub fn new() -> Self {
         CpuSchema {
-            cmd: Arc::new(Mutex::new(Command::Stop)),
-            stat: Arc::new(Mutex::new(State::Stoped)),
+            cmd: Arc::new(RwLock::new(Command::Stop)),
+            stat: Arc::new(RwLock::new(State::Killed)),
         }
     }
 
     pub fn start(&mut self) {
         println!("Receive start");
         let cmd = Arc::clone(&self.cmd);
-        let mut cmd = cmd.lock().unwrap();
+        let mut cmd = cmd.write().unwrap();
         *cmd = Command::Start;
+
+        let stat = Arc::clone(&self.stat);
+        let mut stat = stat.write().unwrap();
+        *stat = State::Running;
     }
 
     pub fn stop(&mut self) {
         println!("Receive stop");
         let cmd = Arc::clone(&self.cmd);
-        let mut cmd = cmd.lock().unwrap();
+        let mut cmd = cmd.write().unwrap();
         *cmd = Command::Stop;
+
+        let stat = Arc::clone(&self.stat);
+        let mut stat = stat.write().unwrap();
+        *stat = State::Stoped;
     }
 
     pub fn kill(&mut self) {
         println!("Receive kill");
         let cmd = Arc::clone(&self.cmd);
-        let mut cmd = cmd.lock().unwrap();
+        let mut cmd = cmd.write().unwrap();
         *cmd = Command::Kill;
+
+        let stat = Arc::clone(&self.stat);
+        let mut stat = stat.write().unwrap();
+        *stat = State::Killed;
 
         // for hander in self.handlers.into_iter() {
         // hander.join().unwrap();
@@ -70,25 +82,29 @@ impl CpuSchema {
     }
 
     pub fn create(&mut self) {
+        self.stop();
+
         let nr_threads: usize = get_num_cpus();
         println!("Using {} threads for cpu stress", nr_threads);
 
         let mut handlers = vec![];
-        for i in 0..nr_threads {
-            let thread_num = Arc::new(Mutex::new(i));
-
+        for _x in 0..nr_threads {
             let cmd = Arc::clone(&self.cmd);
-            let stat = Arc::clone(&self.stat);
 
             let handler = thread::spawn(move || loop {
-                if let (Ok(mut cmd), Ok(mut stat)) = (cmd.lock(), stat.lock()) {
-                    if !worker(&mut cmd, &mut stat) {
-                        break;
-                    }
+                let mut cur_cmd = Command::Stop;
+                if let Ok(cmd) = cmd.read() {
+                    cur_cmd = *cmd;
                 }
-                // thread::sleep(time::Duration::from_micros(1));
-            });
 
+                if cur_cmd == Command::Start {
+                    worker();
+                } else if cur_cmd == Command::Stop {
+                    thread::sleep(time::Duration::from_micros(1));
+                } else if cur_cmd == Command::Kill {
+                    break;
+                }
+            });
             handlers.push(handler);
         }
 
@@ -103,45 +119,11 @@ impl CpuSchema {
     }
 }
 
-fn worker(cmd: &mut Command, stat: &mut State) -> bool {
-    if *cmd == Command::Start {
-        let mut rng = rand::thread_rng();
-        let num: f64 = rng.gen_range(0..(u64::MAX)) as f64;
-        let ret = format!("{:?}", sqrt(num));
-
-        // println!("ret: {:?}", ret);
-
-        // const length: usize = 3;
-
-        // let mut arry1 = [[0; length]; length];
-        // let mut arry2 = [[0; length]; length];
-
-        // let mut rng = rand::thread_rng();
-
-        // for i in 0..length {
-        // for j in 0..length {
-        // let num: u64 = rng.gen_range(0..(u8::MAX as u8)) as u64;
-        // arry1[i][j] = num;
-        // let num: u64 = rng.gen_range(0..(u8::MAX as u8)) as u64;
-        // arry2[i][j] = num;
-        // }
-        // }
-
-        // let a = ndarray::arr2(&arry1);
-        // let b = ndarray::arr2(&arry2);
-
-        // let ret = a.dot(&b);
-        // println!("ret: {:?}", ret.into_raw_vec());
-
-        *stat = State::Running;
-    } else if *cmd == Command::Stop {
-        thread::sleep(time::Duration::from_micros(1));
-        *stat = State::Stoped;
-    } else if *cmd == Command::Kill {
-        return false;
-    }
-
-    true
+fn worker() {
+    let mut rng = rand::thread_rng();
+    let num: f64 = rng.gen_range(0..(u64::MAX)) as f64;
+    let _x = sqrt(num);
+    // let ret = format!("{:?}", x);
 }
 
 fn sqrt(x: f64) -> f64 {

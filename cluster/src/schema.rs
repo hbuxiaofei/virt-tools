@@ -73,12 +73,9 @@ impl ClusterSchema {
         let sector_size = sec.get_sector_size();
         let nr_sector = CLUSTER_SIZE / sector_size;
 
-        let mut check_ret = true;
         for i in 0..nr_sector {
             let ok = sec.check(&self.buf, (sector_size * i) as usize);
-
             if !ok {
-                check_ret = false;
                 vec.push(i);
             }
         }
