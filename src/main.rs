@@ -6,19 +6,28 @@ use cpu::schema::CpuSchema;
 use disk::schema::DiskSchema;
 use sector::schema::SectorSchema;
 
-fn main() {
+fn stress() {
     let mut cpu = CpuSchema::new();
     cpu.create();
     thread::sleep(time::Duration::from_secs(2));
     cpu.start();
-    thread::sleep(time::Duration::from_secs(30));
-    // cpu.stop();
+    thread::sleep(time::Duration::from_secs(10));
+    // cpu.pause();
     cpu.kill();
+}
 
+fn main() {
     let dev_path = "/dev/nbd0";
     let disk = DiskSchema::new(dev_path);
 
     let matches = App::new("KVM virtualization test tools.")
+        .subcommand(
+            SubCommand::with_name("stress").arg(
+                Arg::with_name("debug")
+                    .short('d')
+                    .help("print debug information verbosely"),
+            ),
+        )
         .subcommand(
             SubCommand::with_name("disk-write").arg(
                 Arg::with_name("debug")
@@ -42,7 +51,14 @@ fn main() {
         )
         .get_matches();
 
-    if let Some(matches) = matches.subcommand_matches("disk-write") {
+    if let Some(matches) = matches.subcommand_matches("stress") {
+        if matches.is_present("debug") {
+            println!("Printing debug info...");
+        } else {
+            println!("Printing normally...");
+        }
+        stress();
+    } else if let Some(matches) = matches.subcommand_matches("disk-write") {
         if matches.is_present("debug") {
             println!("Printing debug info...");
         } else {

@@ -7,14 +7,14 @@ use std::{thread, time};
 
 #[derive(PartialEq, Copy, Clone)]
 enum Command {
-    Stop,
+    Pause,
     Start,
     Kill,
 }
 
 #[derive(PartialEq, Copy, Clone)]
 enum State {
-    Stoped,
+    Paused,
     Running,
     Killed,
 }
@@ -26,7 +26,7 @@ pub struct CpuSchema {
 
 impl Default for Command {
     fn default() -> Self {
-        Command::Stop
+        Command::Pause
     }
 }
 
@@ -39,7 +39,7 @@ impl Default for State {
 impl CpuSchema {
     pub fn new() -> Self {
         CpuSchema {
-            cmd: Arc::new(RwLock::new(Command::Stop)),
+            cmd: Arc::new(RwLock::new(Command::Pause)),
             stat: Arc::new(RwLock::new(State::Killed)),
         }
     }
@@ -55,15 +55,15 @@ impl CpuSchema {
         *stat = State::Running;
     }
 
-    pub fn stop(&mut self) {
-        println!("Receive stop");
+    pub fn pause(&mut self) {
+        println!("Receive pause");
         let cmd = Arc::clone(&self.cmd);
         let mut cmd = cmd.write().unwrap();
-        *cmd = Command::Stop;
+        *cmd = Command::Pause;
 
         let stat = Arc::clone(&self.stat);
         let mut stat = stat.write().unwrap();
-        *stat = State::Stoped;
+        *stat = State::Paused;
     }
 
     pub fn kill(&mut self) {
@@ -82,7 +82,7 @@ impl CpuSchema {
     }
 
     pub fn create(&mut self) {
-        self.stop();
+        self.pause();
 
         let nr_threads: usize = get_num_cpus();
         println!("Using {} threads for cpu stress", nr_threads);
@@ -92,14 +92,14 @@ impl CpuSchema {
             let cmd = Arc::clone(&self.cmd);
 
             let handler = thread::spawn(move || loop {
-                let mut cur_cmd = Command::Stop;
+                let mut cur_cmd = Command::Pause;
                 if let Ok(cmd) = cmd.read() {
                     cur_cmd = *cmd;
                 }
 
                 if cur_cmd == Command::Start {
                     worker();
-                } else if cur_cmd == Command::Stop {
+                } else if cur_cmd == Command::Pause {
                     thread::sleep(time::Duration::from_micros(1));
                 } else if cur_cmd == Command::Kill {
                     break;
