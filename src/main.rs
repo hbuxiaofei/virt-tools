@@ -6,8 +6,8 @@ use disk::schema::DiskSchema;
 use sector::schema::SectorSchema;
 use stress::schema::StressSchema;
 
-fn run_stress() {
-    let mut s = StressSchema::new();
+fn run_stress(nr_cpu: usize) {
+    let mut s = StressSchema::new().with_cpu(nr_cpu);
     s.create();
     thread::sleep(time::Duration::from_secs(2));
     s.start();
@@ -20,13 +20,23 @@ fn main() {
     let dev_path = "/dev/nbd0";
     let disk = DiskSchema::new(dev_path);
 
-    let matches = App::new("KVM virtualization test tools.")
+    let matches = App::new("KVM virtualization development tools.")
         .subcommand(
-            SubCommand::with_name("stress").arg(
-                Arg::with_name("debug")
-                    .short('d')
-                    .help("print debug information verbosely"),
-            ),
+            SubCommand::with_name("stress")
+                .about("Imposes certain types of compute stress on your system.")
+                .arg(
+                    Arg::with_name("quiet")
+                        .short('q')
+                        .long("quiet")
+                        .help("Be quiet"),
+                )
+                .arg(
+                    Arg::with_name("cpu")
+                        .short('c')
+                        .long("cpu")
+                        .takes_value(true)
+                        .help("Spawn N workers spinning on sqrt()"),
+                ),
         )
         .subcommand(
             SubCommand::with_name("disk-write").arg(
@@ -52,19 +62,26 @@ fn main() {
         .get_matches();
 
     if let Some(matches) = matches.subcommand_matches("stress") {
-        if matches.is_present("debug") {
-            println!("Printing debug info...");
+        if matches.is_present("quiet") {
+            println!("Quiet level...");
         } else {
-            println!("Printing normally...");
+            println!("No Quiet level...");
         }
-        run_stress();
+
+        if let Some(nr_cpu) = matches.get_one::<String>("cpu") {
+            match nr_cpu.parse::<usize>() {
+                Ok(nr) => {
+                    run_stress(nr);
+                }
+                Err(_) => println!("error: option <cpu> need a integer"),
+            }
+        }
     } else if let Some(matches) = matches.subcommand_matches("disk-write") {
         if matches.is_present("debug") {
             println!("Printing debug info...");
         } else {
             println!("Printing normally...");
         }
-
         disk.fill_whole_disk();
     } else if let Some(matches) = matches.subcommand_matches("disk-check") {
         if matches.is_present("debug") {

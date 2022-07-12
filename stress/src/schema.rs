@@ -22,6 +22,7 @@ enum State {
 pub struct StressSchema {
     cmd: Arc<RwLock<Command>>,
     stat: Arc<RwLock<State>>,
+    nr_cpu: usize,
 }
 
 impl Default for Command {
@@ -41,7 +42,14 @@ impl StressSchema {
         StressSchema {
             cmd: Arc::new(RwLock::new(Command::Pause)),
             stat: Arc::new(RwLock::new(State::Killed)),
+            nr_cpu: 0,
         }
+    }
+
+    pub fn with_cpu(mut self, nr: usize) -> Self {
+        self.nr_cpu = nr;
+
+        self
     }
 
     pub fn start(&mut self) {
@@ -84,7 +92,11 @@ impl StressSchema {
     pub fn create(&mut self) {
         self.pause();
 
-        let nr_threads: usize = get_num_cpus();
+        let mut nr_threads: usize = self.nr_cpu;
+        if nr_threads == 0 {
+            nr_threads = get_num_cpus();
+        }
+
         println!("Using {} threads for cpu stress", nr_threads);
 
         let mut handlers = vec![];
@@ -124,6 +136,7 @@ fn worker() {
     let num: f64 = rng.gen_range(0..(u64::MAX)) as f64;
     let _x = sqrt(num);
     // let ret = format!("{:?}", x);
+    // thread::sleep(time::Duration::from_secs(1));
 }
 
 fn sqrt(x: f64) -> f64 {
