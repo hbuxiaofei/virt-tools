@@ -36,6 +36,19 @@ fn main() {
                         .long("cpu")
                         .takes_value(true)
                         .help("Spawn N workers spinning on sqrt()"),
+                )
+                .arg(
+                    Arg::with_name("timeout")
+                        .short('t')
+                        .long("timeout")
+                        .takes_value(true)
+                        .help("Timeout after N seconds"),
+                )
+                .arg(
+                    Arg::with_name("backoff")
+                        .long("backoff")
+                        .takes_value(true)
+                        .help("Wait factor of N microseconds before work starts"),
                 ),
         )
         .subcommand(
