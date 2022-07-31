@@ -12,6 +12,7 @@ sector = { path = "sector" }
 cluster = { path = "cluster" }
 disk = { path = "disk" }
 stress = { path = "stress" }
+vncclient = { path = "vncclient" }
 
 [workspace]
 members = [
@@ -20,6 +21,7 @@ members = [
     "cluster",
     "disk",
     "stress",
+    "vncclient",
 ]
 
 [[bin]]

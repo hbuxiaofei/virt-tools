@@ -6,6 +6,8 @@ use disk::schema::DiskSchema;
 use sector::schema::SectorSchema;
 use stress::schema::StressSchema;
 
+use vncclient::vnc;
+
 fn run_stress(nr_cpu: usize) {
     let mut s = StressSchema::new().with_cpu(nr_cpu);
     s.create();
