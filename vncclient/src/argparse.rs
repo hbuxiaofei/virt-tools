@@ -142,38 +142,22 @@ pub fn parse() -> Result<Opts, Box<dyn std::error::Error>> {
                 .short('o')
                 .takes_value(true),
         )
-        .arg(
-            Arg::new("WEB PROXY")
-                .long("web-proxy")
-                .takes_value(true),
-        )
-        .arg(
-            Arg::new("RDP PROXY")
-                .long("rdp-proxy")
-                .takes_value(true),
-        )
+        .arg(Arg::new("WEB PROXY").long("web-proxy").takes_value(true))
+        .arg(Arg::new("RDP PROXY").long("rdp-proxy").takes_value(true))
         .arg(
             Arg::new("PROXY")
                 .long("proxy")
                 .takes_value(true)
                 .validator(is_socks5),
         )
-        .arg(
-            Arg::new("SILENT")
-                .long("silent")
-                .short('s'),
-        )
+        .arg(Arg::new("SILENT").long("silent").short('s'))
         .arg(
             Arg::new("VERBOSE")
                 .long("verbose")
-                .multiple(true)
                 .short('v')
                 .takes_value(false),
         )
-        .arg(
-            Arg::new("TEST IMPORT")
-                .long("test-import"),
-        )
+        .arg(Arg::new("TEST IMPORT").long("test-import"))
         .group(
             ArgGroup::new("inputs")
                 .multiple(true)

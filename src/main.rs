@@ -6,7 +6,7 @@ use disk::schema::DiskSchema;
 use sector::schema::SectorSchema;
 use stress::schema::StressSchema;
 
-use vncclient::vnc;
+use vncclient::{argparse, vnc};
 
 fn run_stress(nr_cpu: usize) {
     let mut s = StressSchema::new().with_cpu(nr_cpu);
@@ -19,6 +19,12 @@ fn run_stress(nr_cpu: usize) {
 }
 
 fn main() {
+    let opts = argparse::parse().unwrap();
+
+    vnc::snapshot(opts);
+}
+
+fn main2() {
     let dev_path = "/dev/nbd0";
     let disk = DiskSchema::new(dev_path);
 

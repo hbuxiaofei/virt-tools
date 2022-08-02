@@ -17,19 +17,31 @@
  *   along with Scrying.  If not, see <https://www.gnu.org/licenses/>.
 */
 
+use crate::argparse;
 use crate::argparse::Mode::Vnc;
 use crate::argparse::Opts;
 use crate::error::Error;
 use crate::parsing::Target;
+use crate::parsing::{generate_target_lists, InputLists};
 use crate::util::target_to_filename;
 use crate::ThreadStatus;
 use image::{DynamicImage, ImageBuffer, Rgb};
 #[allow(unused)]
 use log::{debug, error, info, trace, warn};
+
+use simplelog::{
+    CombinedLogger, Config, LevelFilter, SharedLogger, TermLogger, TerminalMode, WriteLogger,
+};
+
 use std::convert::TryInto;
+use std::fs::create_dir_all;
+use std::fs::File;
 use std::net::TcpStream;
 use std::path::Path;
+use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::mpsc::Sender;
+use std::sync::{mpsc, Arc};
+use std::thread;
 use vnc::client::{AuthChoice, AuthMethod, Client};
 use vnc::Colour;
 use vnc::{PixelFormat, Rect};
@@ -441,10 +453,158 @@ fn vnc_poll(mut vnc: Client, vnc_image: &mut Image) -> Result<(), Error> {
     }
 }
 
-pub fn capture(target: &Target, opts: &Opts, tx: Sender<ThreadStatus>) {
+fn capture(target: &Target, opts: &Opts, tx: Sender<ThreadStatus>) {
     if let Err(e) = vnc_capture(&target, opts) {
         warn!("VNC error: {}", e);
     }
 
     tx.send(ThreadStatus::Complete).unwrap();
+}
+
+pub fn snapshot(opts: argparse::Opts) {
+    println!("Starting NCC Group Scrying...");
+    let opts = Arc::new(argparse::parse().unwrap());
+
+    // Configure logging
+    let mut log_dests: Vec<Box<dyn SharedLogger>> = Vec::new();
+
+    if let Some(log_file) = &opts.log_file {
+        // Enable logging to a file at INFO level by default
+        // Increasing global log verbosity increases log file verbosity
+        // accordingly. Combinations such as --silent -vv make sense
+        // when using a log file as the file will get TRACE messages
+        // while the terminal only gets WARN and higher.
+        let level_filter = match opts.verbose {
+            0 => LevelFilter::Info,
+            1 => LevelFilter::Debug,
+            _ => LevelFilter::Trace,
+        };
+        log_dests.push(WriteLogger::new(
+            level_filter,
+            Config::default(),
+            File::create(log_file).unwrap(),
+        ));
+    }
+
+    let level_filter = if !opts.silent {
+        match opts.verbose {
+            0 => LevelFilter::Info,
+            1 => LevelFilter::Debug,
+            _ => LevelFilter::Trace,
+        }
+    } else {
+        LevelFilter::Warn
+    };
+
+    log_dests.push(TermLogger::new(
+        level_filter,
+        Config::default(),
+        TerminalMode::Mixed,
+    ));
+
+    CombinedLogger::init(log_dests).unwrap();
+
+    debug!("Got opts:\n{:?}", opts);
+
+    // Load in the target lists, parsed from arguments, files, and nmap
+    let targets = Arc::new(generate_target_lists(&opts));
+    println!("{}", targets);
+
+    if opts.test_import {
+        info!("--test-import was supplied, exiting");
+        return;
+    }
+
+    if targets.vnc_targets.is_empty() {
+        error!("No targets imported, exiting");
+        return;
+    }
+
+    // Create output directories if they do not exist
+    let output_base = Path::new(&opts.output_dir);
+    let vnc_output_dir = output_base.join("vnc");
+    if !targets.vnc_targets.is_empty() && !vnc_output_dir.is_dir() {
+        create_dir_all(&vnc_output_dir)
+            .unwrap_or_else(|_| panic!("Error creating directory {}", vnc_output_dir.display()));
+    }
+
+    // Attach interrupt handler to catch ctrl-c
+    let caught_ctrl_c = Arc::new(AtomicBool::new(false));
+    let caught_ctrl_c_clone_for_handler = caught_ctrl_c.clone();
+    ctrlc::set_handler(move || {
+        warn!("Caught interrupt signal, cleaning up...");
+        caught_ctrl_c_clone_for_handler.store(true, Ordering::SeqCst);
+    })
+    .expect("Unable to attach interrupt signal handler");
+
+    // Start report collating thread
+    let opts_clone = opts.clone();
+    let targets_clone = targets.clone();
+
+    let vnc_handle = if !targets.vnc_targets.is_empty() {
+        // clone here will be more useful when there are more target types
+        let targets_clone = targets; //.clone();
+        let opts_clone = opts; //.clone();
+        let caught_ctrl_c_clone = caught_ctrl_c; //.clone();
+        Some(thread::spawn(move || {
+            debug!("Starting VNC worker threads");
+            vnc_worker(targets_clone, opts_clone, caught_ctrl_c_clone).unwrap()
+        }))
+    } else {
+        None
+    };
+
+    // wait for the workers to complete
+    if let Some(h) = vnc_handle {
+        h.join().unwrap();
+    }
+}
+
+fn vnc_worker(
+    targets: Arc<InputLists>,
+    opts: Arc<Opts>,
+    caught_ctrl_c: Arc<AtomicBool>,
+) -> Result<(), Box<dyn std::error::Error>> {
+    use mpsc::{Receiver, Sender};
+    let max_workers = opts.threads;
+    let mut num_workers: usize = 0;
+    let mut targets_iter = targets.vnc_targets.iter();
+    let mut workers: Vec<_> = Vec::new();
+    let (thread_status_tx, thread_status_rx): (Sender<ThreadStatus>, Receiver<ThreadStatus>) =
+        mpsc::channel();
+    while !caught_ctrl_c.load(Ordering::SeqCst) {
+        // check for status messages
+        // Turn off clippy's single_match warning here because match
+        // matches the intuition for how try_recv is processed better
+        // than an if let.
+        #[allow(clippy::single_match)]
+        match thread_status_rx.try_recv() {
+            Ok(ThreadStatus::Complete) => {
+                info!("Thread complete, yay");
+                num_workers -= 1;
+            }
+            Err(_) => {}
+        }
+        if num_workers < max_workers {
+            if let Some(target) = targets_iter.next() {
+                let target = target.clone();
+                info!("Adding VNC worker for {:?}", target);
+                let opts_clone = opts.clone();
+                let tx = thread_status_tx.clone();
+                let handle = thread::spawn(move || capture(&target, &opts_clone, tx));
+
+                workers.push(handle);
+                num_workers += 1;
+            } else {
+                break;
+            }
+        }
+    }
+    debug!("At the join part");
+    for w in workers {
+        debug!("Joining {:?}", w);
+        w.join().unwrap();
+    }
+
+    Ok(())
 }

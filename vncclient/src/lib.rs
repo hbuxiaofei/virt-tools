@@ -1,14 +1,14 @@
+pub mod argparse;
 pub mod vnc;
 
-mod argparse;
 mod error;
 mod parsing;
 // mod reporting;
 mod util;
 
-pub enum ThreadStatus {                                                            
-    Complete,                                                                      
-}  
+pub enum ThreadStatus {
+    Complete,
+}
 
 #[cfg(test)]
 mod tests {
